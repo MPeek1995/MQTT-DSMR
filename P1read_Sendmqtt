@@ -1,0 +1,152 @@
+#
+# DSMR P1 uitlezer
+# 11-2017 2016 - GJ
+# 16-4-2021 - M.Peek 
+
+
+versie = "1.2"
+import sys
+import serial
+import paho.mqtt.client as mqtt
+import time
+
+################
+#Error display #
+################
+def show_error():
+    ft = sys.exc_info()[0]
+    fv = sys.exc_info()[1]
+    print("Fout type: %s" % ft )
+    print("Fout waarde: %s" % fv )
+    return
+
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code ")
+    
+################################################################################################################################################
+#Main program
+################################################################################################################################################
+print ("DSMR 5.0 P1 uitlezer")
+
+client = mqtt.Client()
+client.on_connect = on_connect
+client.username_pw_set(username="mqtt",password="mqtt1919")
+client.connect("192.168.2.12", 1883, 60)
+#client.loop_forever()
+
+#Set COM port config
+ser = serial.Serial()
+ser.baudrate = 115200
+ser.bytesize=serial.EIGHTBITS
+ser.parity=serial.PARITY_NONE
+ser.stopbits=serial.STOPBITS_ONE
+ser.xonxoff=0
+ser.rtscts=0
+ser.timeout=20
+ser.port="/dev/ttyUSB0"
+
+
+while True:
+    #Open COM port
+    try:
+        ser.open()
+    except:
+        sys.exit ("Fout bij het openen van %s. Programma afgebroken."  % ser.name)      
+
+
+
+    p1_teller=0
+    stack=[]
+
+    while p1_teller < 34:
+        p1_line=''
+ 
+        try:
+            p1_raw = ser.readline()
+        except:
+            sys.exit ("Seriele poort %s kan niet gelezen worden. Programma afgebroken." % ser.name )      
+        p1_str=str(p1_raw)
+        #p1_str=str(p1_raw, "utf-8")
+        p1_line=p1_str.strip()
+        stack.append(p1_line)
+        p1_teller = p1_teller +1
+
+    
+    stack_teller=0
+    meter=0
+
+    while stack_teller < 34:
+        print(stack[stack_teller][0:10])  ###
+        if stack[stack_teller][0:9] == "1-0:1.8.1":
+            print("Afgenomen daltarief    ", stack[stack_teller][10:16])  ###
+            data = int(float(stack[stack_teller][10:16]))
+            client.publish("/energymeter/main/dallever", data)
+        elif stack[stack_teller][0:9] == "1-0:1.8.2":
+            print("Afgenomen piektarief   ", stack[stack_teller][10:16])  ###
+            data = int(float(stack[stack_teller][10:16]))
+            client.publish("/energymeter/main/pieklever", data)
+        elif stack[stack_teller][0:9] == "1-0:2.8.1":
+            print("Teruggeleverd daltarief   ", stack[stack_teller][10:16])  ###
+            data = int(float(stack[stack_teller][10:16]))
+            client.publish("/energymeter/main/dalteruglever", data)
+        elif stack[stack_teller][0:9] == "1-0:2.8.2":
+            print("Teruggeleverd piek   ", stack[stack_teller][10:16])  ###
+            data = int(float(stack[stack_teller][10:16]))
+            client.publish("/energymeter/main/piekteruglever", data)
+        elif stack[stack_teller][0:11] == "0-0:96.14.0":
+            print("Huidig tarief   ", stack[stack_teller][15:16])  ###
+            data = stack[stack_teller][15:16]
+            client.publish("/energymeter/main/tarief", data)
+        elif stack[stack_teller][0:9] == "1-0:1.7.0":
+            print("Huidig geleverd vermogen (W)  ", stack[stack_teller][10:16])  ###
+            data = int(float(stack[stack_teller][10:16]))
+            client.publish("/energymeter/main/vermogenlever", data)
+        elif stack[stack_teller][0:9] == "1-0:2.7.0":
+            print("Huidig teruggeleverd vermogen (W)   ", stack[stack_teller][10:16])  ###
+            data = int(float(stack[stack_teller][10:16]))
+            client.publish("/energymeter/main/vermogenteruglever", data)   
+        elif stack[stack_teller][0:10] == "1-0:32.7.0":
+            print("Spanning L1   ", stack[stack_teller][11:16])  ###
+            data = stack[stack_teller][11:16]
+            client.publish("/energymeter/main/spanningl1", data)
+        elif stack[stack_teller][0:10] == "1-0:52.7.0":
+            print("Spanning L2   ", stack[stack_teller][11:16])  ###
+            data = stack[stack_teller][11:16]
+            client.publish("/energymeter/main/spanningl2", data)
+        elif stack[stack_teller][0:10] == "1-0:72.7.0":
+            print("Spanning L3   ", stack[stack_teller][11:16])  ###
+            data = stack[stack_teller][11:16]
+            client.publish("/energymeter/main/spanningl3", data)
+        elif stack[stack_teller][0:10] == "1-0:31.7.0":
+            print("Stroom L1   ", stack[stack_teller][10:14])  ###
+            data = stack[stack_teller][11:14]
+            client.publish("/energymeter/main/strooml1", data)
+        elif stack[stack_teller][0:10] == "1-0:51.7.0":
+            print("Stroom L2   ", stack[stack_teller][10:14])  ###
+            data = stack[stack_teller][11:14]
+            client.publish("/energymeter/main/strooml2", data)
+        elif stack[stack_teller][0:10] == "1-0:71.7.0":
+            print("Stroom L3   ", stack[stack_teller][10:14])  ###
+            data = stack[stack_teller][11:14]
+            client.publish("/energymeter/main/strooml3", data)
+        elif stack[stack_teller][0:10] == "1-0:21.7.0":
+            print("Vermogen L1   ", stack[stack_teller][10:16])  ###
+            data = stack[stack_teller][11:16]
+            client.publish("/energymeter/main/vermogenl1", data)
+        elif stack[stack_teller][0:10] == "1-0:41.7.0":
+            print("Vermogen L2   ", stack[stack_teller][10:16])  ###
+            data = stack[stack_teller][11:16]
+            client.publish("/energymeter/main/vermogenl2", data)
+        elif stack[stack_teller][0:10] == "1-0:61.7.0":
+            print("Vermogen L3  ", stack[stack_teller][10:16])  ###
+            data = stack[stack_teller][11:16]
+            client.publish("/energymeter/main/vermogenl3", data)
+        else:
+            pass
+        stack_teller = stack_teller + 1
+
+    try:
+        ser.close()
+    except:
+        sys.exit ("Oops %s. Programma afgebroken." % ser.name )   
+    time.sleep(5)
